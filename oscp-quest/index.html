@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>MAEVE // OSCP Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ── HEADER ── -->
+  <div class="header">
+    <!-- skull: 16×16 pixel art, 3 animations -->
+    <div class="skull-glitch-wrap">
+      <div class="skull-float-wrap">
+        <svg class="pixel-skull" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated;display:block">
+          <!-- cranium rows 0-2 (tapered top) -->
+          <rect x="4"  y="0" width="8"  height="1" fill="#fff"/>
+          <rect x="2"  y="1" width="12" height="1" fill="#fff"/>
+          <rect x="1"  y="2" width="14" height="1" fill="#fff"/>
+          <!-- full head rows 3-10 -->
+          <rect x="0"  y="3" width="16" height="8" fill="#fff"/>
+          <!-- jaw rows 11-12 (tapering) -->
+          <rect x="1"  y="11" width="14" height="1" fill="#fff"/>
+          <rect x="2"  y="12" width="12" height="1" fill="#fff"/>
+          <!-- teeth (4 teeth × 2px wide, 1px gaps, 2px tall) -->
+          <rect x="2"  y="13" width="2" height="2" fill="#fff"/>
+          <rect x="5"  y="13" width="2" height="2" fill="#fff"/>
+          <rect x="8"  y="13" width="2" height="2" fill="#fff"/>
+          <rect x="11" y="13" width="2" height="2" fill="#fff"/>
+          <!-- highlight shading (top-right corner) -->
+          <rect x="11" y="2"  width="3" height="2" fill="#ecdeff"/>
+          <rect x="13" y="3"  width="2" height="3" fill="#ecdeff"/>
+          <!-- skull crack -->
+          <rect x="8"  y="1"  width="1" height="5" fill="#d0b8f0" opacity="0.75"/>
+          <!-- left eye socket -->
+          <rect class="skull-eye" id="eye-l" x="2"  y="5" width="3" height="3"/>
+          <!-- inner eye glint (white pixel) -->
+          <rect class="skull-eye-glint" id="glint-l" x="4" y="5" width="1" height="1" fill="white" opacity="0"/>
+          <!-- right eye socket -->
+          <rect class="skull-eye" id="eye-r" x="11" y="5" width="3" height="3"/>
+          <rect class="skull-eye-glint" id="glint-r" x="13" y="5" width="1" height="1" fill="white" opacity="0"/>
+          <!-- nose cavity -->
+          <rect x="7"  y="9"  width="2" height="2" fill="#3d2060"/>
+          <!-- scanline sweep -->
+          <rect class="skull-scan" x="0" y="0" width="16" height="1" fill="white" opacity="0"/>
+        </svg>
+      </div>
+    </div>
+    <div>
+      <div class="header-title">MAEVE</div>
+      <div class="header-sub" id="header-sub">your oscp companion // track · root · level up</div>
+    </div>
+    <div id="goal-countdown" style="font-size:8px;color:#e8d5ff;margin-left:8px"></div>
+    <div class="level-badge" id="level-badge">
+      <span class="level-name" id="level-name">NOOB</span>
+      <span class="level-xp"  id="level-xp">0 XP</span>
+    </div>
+  </div>
+
+  <!-- ── STATS ── -->
+  <div class="stats-bar" id="stats-bar"></div>
+
+  <div class="bar-label">completion progress</div>
+  <div class="pixel-bar-wrap">
+    <div class="pixel-bar-fill" id="progress-bar" style="width:0%"></div>
+    <span class="pixel-bar-text" id="progress-text">0%</span>
+  </div>
+
+  <div class="bar-label" id="xp-bar-label">xp progress</div>
+  <div class="xp-bar-wrap">
+    <div class="xp-bar-fill" id="xp-bar" style="width:0%"></div>
+    <span class="xp-bar-text" id="xp-bar-text">0%</span>
+  </div>
+
+  <!-- ── TOOLBAR ── -->
+  <div class="toolbar">
+    <button class="px-btn small info"    onclick="exportJSON()">export json</button>
+    <label  class="px-btn small"         style="cursor:pointer">import json
+      <input type="file" accept=".json"  style="display:none" onchange="importJSON(this)"/>
+    </label>
+  </div>
+
+  <!-- ── TABS ── -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('machines')">machines</div>
+    <div class="tab"        onclick="switchTab('skills')">skill map</div>
+    <div class="tab"        onclick="switchTab('cheatsheet')">cheatsheet</div>
+    <div class="tab"        onclick="switchTab('adlab')">AD lab</div>
+    <div class="tab"        onclick="switchTab('settings')">settings</div>
+  </div>
+
+  <!-- ══ PANEL: MACHINES ══ -->
+  <div class="panel active" id="panel-machines">
+    <div class="filter-row">
+      <select class="px-select" id="filter-platform" onchange="renderMachines()">
+        <option value="">all platforms</option>
+        <option value="HTB">HTB</option>
+        <option value="PG">PG</option>
+        <option value="THM">THM</option>
+      </select>
+      <select class="px-select" id="filter-os" onchange="renderMachines()">
+        <option value="">all OS</option>
+        <option value="Linux">Linux</option>
+        <option value="Windows">Windows</option>
+      </select>
+      <select class="px-select" id="filter-diff" onchange="renderMachines()">
+        <option value="">all difficulty</option>
+        <option value="Easy">easy</option>
+        <option value="Medium">medium</option>
+        <option value="Hard">hard</option>
+      </select>
+      <select class="px-select" id="filter-status" onchange="renderMachines()">
+        <option value="">all status</option>
+        <option value="todo">todo</option>
+        <option value="progress">in progress</option>
+        <option value="rooted">rooted</option>
+      </select>
+      <input class="px-input" id="filter-search" placeholder="search..." oninput="renderMachines()" style="flex:1;min-width:80px"/>
+      <button class="px-btn small success" onclick="openAddMachine()">+ add machine</button>
+    </div>
+
+    <div class="list-header">
+      <span>status</span>
+      <span>machine</span>
+      <span>platform</span>
+      <span>os</span>
+      <span>difficulty</span>
+      <span>tags</span>
+      <span></span>
+    </div>
+
+    <div class="machine-list" id="machine-list"></div>
+  </div>
+
+  <!-- ══ PANEL: SKILLS ══ -->
+  <div class="panel" id="panel-skills">
+    <div class="section-label">techniques by category</div>
+    <div id="skill-map"></div>
+  </div>
+
+  <!-- ══ PANEL: CHEATSHEET ══ -->
+  <div class="panel" id="panel-cheatsheet">
+    <div class="filter-row">
+      <button class="px-btn small"         onclick="addCheatEntry()">+ new entry</button>
+      <button class="px-btn small success"  onclick="exportMarkdown()">export .md</button>
+      <div id="cheat-tag-filter"></div>
+    </div>
+    <div class="cheat-grid" id="cheat-grid"></div>
+  </div>
+
+  <!-- ══ PANEL: AD LAB ══ -->
+  <div class="panel" id="panel-adlab">
+    <div class="section-label">AD attack chain // what you need for OSCP</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:8px;color:var(--px-text2);line-height:2">
+        check off techniques as you practice them &nbsp;|&nbsp; click to expand commands
+      </div>
+      <button class="px-btn small success" onclick="openAddADTech()">+ add technique</button>
+    </div>
+    <div class="ad-progress" id="ad-progress"></div>
+    <div class="ad-lab-grid" id="ad-lab-grid"></div>
+  </div>
+
+  <!-- ══ PANEL: SETTINGS ══ -->
+  <div class="panel" id="panel-settings">
+    <div class="settings-grid">
+
+      <div class="settings-section">
+        <div class="settings-section-title">profile</div>
+        <div class="settings-row">
+          <span class="settings-label">your name</span>
+          <input class="px-input" id="settings-username" placeholder="h4x0r" style="flex:1"/>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label">exam goal date</span>
+          <input class="px-input" id="settings-goaldate" type="date" style="flex:1"/>
+        </div>
+        <div style="margin-top:10px">
+          <button class="px-btn small success" onclick="saveSettings()">save profile</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">theme</div>
+        <div style="font-size:8px;color:var(--px-text2);margin-bottom:8px">click a swatch to switch theme</div>
+        <div class="theme-swatches" id="theme-swatches"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- .app -->
+
+<!-- ── ADD / EDIT MACHINE MODAL ── -->
+<div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--px-surface);border:3px solid var(--px-text);box-shadow:6px 6px 0 var(--px-text);padding:18px;width:min(480px,94vw);font-family:'Press Start 2P',monospace;">
+    <div style="font-size:11px;color:var(--px-text);margin-bottom:14px;border-bottom:2px dashed var(--px-border);padding-bottom:8px" id="modal-title">add machine</div>
+    <input type="hidden" id="modal-m-id"/>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:8px;color:var(--px-text2)">name *</div>
+      <input  class="px-input" id="modal-m-name"     placeholder="Machine Name" style="width:100%"/>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:8px;color:var(--px-text2);margin-bottom:4px">platform</div>
+          <select class="px-select" id="modal-m-platform" style="width:100%">
+            <option value="HTB">HTB</option>
+            <option value="PG">PG</option>
+            <option value="THM">THM</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:8px;color:var(--px-text2);margin-bottom:4px">OS</div>
+          <select class="px-select" id="modal-m-os" style="width:100%">
+            <option value="Linux">Linux</option>
+            <option value="Windows">Windows</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:8px;color:var(--px-text2);margin-bottom:4px">difficulty</div>
+          <select class="px-select" id="modal-m-diff" style="width:100%">
+            <option value="Easy">Easy</option>
+            <option value="Medium">Medium</option>
+            <option value="Hard">Hard</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="modal-m-isad" style="accent-color:var(--px-purple);width:14px;height:14px"/>
+        <label for="modal-m-isad" style="font-size:8px;color:var(--px-text2);cursor:pointer">Active Directory box</label>
+      </div>
+
+      <div style="font-size:8px;color:var(--px-text2)">URL</div>
+      <input class="px-input" id="modal-m-url" placeholder="https://..." style="width:100%"/>
+
+      <div style="font-size:8px;color:var(--px-text2)">tags (comma separated)</div>
+      <input class="px-input" id="modal-m-tags" placeholder="smb, privesc, rce" style="width:100%"/>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-top:14px">
+      <button class="px-btn small danger" id="modal-delete-btn" onclick="deleteMachineModal()" style="display:none">delete</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="px-btn small"         onclick="closeMachineModal()">cancel</button>
+        <button class="px-btn small success"  onclick="saveMachineModal()">save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD / EDIT AD TECHNIQUE MODAL ── -->
+<div id="adtech-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--px-surface);border:3px solid var(--px-text);box-shadow:6px 6px 0 var(--px-text);padding:18px;width:min(500px,94vw);font-family:'Press Start 2P',monospace;">
+    <div style="font-size:11px;color:var(--px-text);margin-bottom:14px;border-bottom:2px dashed var(--px-border);padding-bottom:8px" id="adtech-modal-title">add technique</div>
+    <input type="hidden" id="adtech-id"/>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:8px;color:var(--px-text2)">name *</div>
+      <input  class="px-input" id="adtech-name" placeholder="e.g. 13. Constrained Delegation" style="width:100%"/>
+      <div style="font-size:8px;color:var(--px-text2)">description</div>
+      <input  class="px-input" id="adtech-desc" placeholder="one-liner about when/why you use this" style="width:100%"/>
+      <div style="font-size:8px;color:var(--px-text2)">commands</div>
+      <textarea class="note-area" id="adtech-cmd" style="min-height:130px;font-size:8px" placeholder="# paste your commands here"></textarea>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:14px">
+      <button class="px-btn small danger" id="adtech-delete-btn" onclick="deleteADTechModal()" style="display:none">delete</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="px-btn small"        onclick="closeADTechModal()">cancel</button>
+        <button class="px-btn small success" onclick="saveADTechModal()">save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
