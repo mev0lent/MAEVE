@@ -101,6 +101,7 @@ body {
 
 .header-title { font-size: var(--px-font-lg); color: #fff; text-shadow: 2px 2px 0 var(--px-text); letter-spacing: 1px; }
 .header-sub   { font-size: var(--px-font-xs); color: #e8d5ff; margin-top: 5px; }
+.header-quote { font-size: 7px; color: #d4b8f0; margin-top: 3px; font-style: italic; }
 
 .level-badge {
   margin-left: auto; flex-shrink: 0;
@@ -237,8 +238,8 @@ body {
   padding: 8px 10px; transition: border-color 0.15s;
 }
 .machine-row:hover { border-color: var(--px-text); }
-.machine-row.rooted      { background: #edfff5; border-color: #6bc87a; }
-.machine-row.in-progress { background: #fffbe8; border-color: #d4b84a; }
+.machine-row.rooted      { background: var(--px-rooted-bg, #edfff5); border-color: var(--px-rooted-border, #6bc87a); }
+.machine-row.in-progress { background: var(--px-prog-bg,   #fffbe8); border-color: var(--px-prog-border,   #d4b84a); }
 
 .status-col {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -307,11 +308,11 @@ body {
 }
 .note-area:focus { outline: none; border-color: var(--px-text); }
 
-/* cheatsheet content textarea — regular monospace, dark bg like code blocks */
+/* cheatsheet content textarea — fixed dark bg regardless of theme */
 .cheat-content-area {
   font-family: 'Courier New', Courier, monospace;
   font-size: 11px; line-height: 1.8;
-  background: var(--px-text); color: #e8d5ff;
+  background: #13111f; color: #e8d5ff;
   border-color: transparent; min-height: 160px;
 }
 .cheat-content-area:focus { border-color: var(--px-pink); }
@@ -350,7 +351,7 @@ body {
 
 .cheat-snippet {
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px; background: var(--px-text); color: #e8d5ff;
+  font-size: 8px; background: #13111f; color: #e8d5ff;
   padding: 10px; white-space: pre-wrap; word-break: break-all;
   line-height: 2; outline: none;
 }
@@ -472,7 +473,7 @@ body {
   border: 1px solid var(--px-border);
 }
 .md-preview pre {
-  background: var(--px-text); color: #e8d5ff;
+  background: #13111f; color: #e8d5ff;
   padding: 10px; margin: 8px 0; overflow-x: auto;
   font-size: 11px; line-height: 1.8;
 }

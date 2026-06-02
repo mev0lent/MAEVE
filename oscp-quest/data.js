@@ -245,39 +245,94 @@ const LEVELS = [
 
 const THEMES = {
   pastel: {
-    label: "Pastel", swatch: "#b388f0",
+    label: "Pastel",
+    swatch: "#b388f0",
     vars: {
-      "--px-bg":"#f0e6ff","--px-bg2":"#e8d5ff","--px-surface":"#fdf6ff",
-      "--px-border":"#c9a8f0","--px-purple":"#b388f0","--px-pink":"#f0a8d0",
-      "--px-mint":"#a8f0d8","--px-yellow":"#f0e8a8","--px-blue":"#a8d0f0",
-      "--px-red":"#f0a8a8","--px-text":"#3d2060","--px-text2":"#7a5599",
+      "--px-bg":            "#f0e6ff",
+      "--px-bg2":           "#e8d5ff",
+      "--px-surface":       "#fdf6ff",
+      "--px-border":        "#c9a8f0",
+      "--px-purple":        "#b388f0",   // header
+      "--px-pink":          "#f0a8d0",   // tags
+      "--px-mint":          "#a8f0d8",   // success / bar fill
+      "--px-yellow":        "#f0e8a8",   // buttons
+      "--px-blue":          "#a8d0f0",   // links / info
+      "--px-red":           "#f0a8a8",   // danger
+      "--px-text":          "#3d2060",   // main text + borders + shadows
+      "--px-text2":         "#7a5599",   // secondary text
+      "--px-rooted-bg":     "#edfff5",   // rooted row bg
+      "--px-rooted-border": "#6bc87a",   // rooted row border
+      "--px-prog-bg":       "#fffbe8",   // in-progress row bg
+      "--px-prog-border":   "#d4b84a",   // in-progress row border
     },
   },
+
   dark: {
-    label: "Dark", swatch: "#1a1a2e",
+    label: "Dark",
+    swatch: "#7c3aed",                   // vivid purple — distinct from hacker
     vars: {
-      "--px-bg":"#1a1a2e","--px-bg2":"#16213e","--px-surface":"#0f3460",
-      "--px-border":"#533483","--px-purple":"#7b2d8b","--px-pink":"#e94560",
-      "--px-mint":"#0f9b58","--px-yellow":"#f5a623","--px-blue":"#4a90d9",
-      "--px-red":"#e94560","--px-text":"#e0e0ff","--px-text2":"#a8a8cc",
+      "--px-bg":            "#09090f",
+      "--px-bg2":           "#13111f",
+      "--px-surface":       "#1e1b2e",
+      "--px-border":        "#5b21b6",
+      "--px-purple":        "#7c3aed",   // header — vivid purple
+      "--px-pink":          "#ec4899",   // tags — hot pink
+      "--px-mint":          "#34d399",   // success — emerald
+      "--px-yellow":        "#fbbf24",   // buttons — amber, great on dark
+      "--px-blue":          "#60a5fa",   // links — sky blue
+      "--px-red":           "#f87171",   // danger — soft red
+      "--px-text":          "#f1efff",   // light text → also used for neon-white borders
+      "--px-text2":         "#a89dc0",   // muted purple-gray
+      "--px-rooted-bg":     "#0a1f12",   // dark green tint
+      "--px-rooted-border": "#34d399",
+      "--px-prog-bg":       "#1c1608",   // dark amber tint
+      "--px-prog-border":   "#fbbf24",
     },
   },
+
   hacker: {
-    label: "Hacker", swatch: "#0d1117",
+    label: "Hacker",
+    swatch: "#22c55e",                   // terminal green — clearly distinct
     vars: {
-      "--px-bg":"#0d1117","--px-bg2":"#161b22","--px-surface":"#21262d",
-      "--px-border":"#30a050","--px-purple":"#39d353","--px-pink":"#7ee787",
-      "--px-mint":"#56d364","--px-yellow":"#e3b341","--px-blue":"#58a6ff",
-      "--px-red":"#f85149","--px-text":"#c9d1d9","--px-text2":"#8b949e",
+      "--px-bg":            "#0d1117",
+      "--px-bg2":           "#161b22",
+      "--px-surface":       "#21262d",
+      "--px-border":        "#238636",   // GitHub green border
+      "--px-purple":        "#1a7f37",   // header — deep forest green (readable, not neon)
+      "--px-pink":          "#58a6ff",   // tags — GitHub blue (contrast against all the green)
+      "--px-mint":          "#22c55e",   // success — bright terminal green
+      "--px-yellow":        "#d29922",   // buttons — golden amber (stands out on dark!)
+      "--px-blue":          "#79c0ff",   // links — lighter GitHub blue
+      "--px-red":           "#f85149",   // danger — GitHub red
+      "--px-text":          "#e6edf3",   // GitHub dark main text
+      "--px-text2":         "#7d8590",   // GitHub muted text
+      "--px-rooted-bg":     "#071e0c",   // very dark green
+      "--px-rooted-border": "#22c55e",
+      "--px-prog-bg":       "#1a1200",   // very dark amber
+      "--px-prog-border":   "#d29922",
     },
   },
+
   sunset: {
-    label: "Sunset", swatch: "#ff6b6b",
+    label: "Sunset",
+    swatch: "#f97316",                   // orange
     vars: {
-      "--px-bg":"#fff5f0","--px-bg2":"#ffe8e0","--px-surface":"#fff9f7",
-      "--px-border":"#ffb08a","--px-purple":"#ff6b6b","--px-pink":"#ffa07a",
-      "--px-mint":"#98d8c8","--px-yellow":"#ffd166","--px-blue":"#118ab2",
-      "--px-red":"#ef476f","--px-text":"#2d1a00","--px-text2":"#8b4513",
+      "--px-bg":            "#fef3ee",
+      "--px-bg2":           "#fde8d8",
+      "--px-surface":       "#fff8f5",
+      "--px-border":        "#fb923c",
+      "--px-purple":        "#c2410c",   // header — burnt orange
+      "--px-pink":          "#f43f5e",   // tags — rose
+      "--px-mint":          "#0d9488",   // success — teal
+      "--px-yellow":        "#fcd34d",   // buttons — warm yellow
+      "--px-blue":          "#0284c7",   // links — ocean blue
+      "--px-red":           "#dc2626",   // danger
+      "--px-text":          "#431407",   // deep brown text
+      "--px-text2":         "#9a3412",   // rust secondary
+      "--px-rooted-bg":     "#f0fdf4",
+      "--px-rooted-border": "#10b981",
+      "--px-prog-bg":       "#fffbeb",
+      "--px-prog-border":   "#d97706",
     },
   },
 };

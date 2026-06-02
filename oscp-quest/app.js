@@ -689,11 +689,9 @@ const MAEVE_QUOTES = [
 function updateGreeting() {
   const el = document.getElementById('header-sub');
   if (!el) return;
-  if (state.settings.userName) {
-    el.textContent = `welcome back, ${state.settings.userName} — ${MAEVE_QUOTES[Math.floor(Math.random()*MAEVE_QUOTES.length)]}`;
-  } else {
-    el.textContent = 'your oscp companion // track · root · level up';
-  }
+  const quote  = MAEVE_QUOTES[Math.floor(Math.random() * MAEVE_QUOTES.length)];
+  const prefix = state.settings.userName ? `welcome back, ${state.settings.userName} — ` : '';
+  el.textContent = prefix + quote;
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────
