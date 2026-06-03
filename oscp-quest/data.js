@@ -315,24 +315,93 @@ const THEMES = {
 
   sunset: {
     label: "Sunset",
-    swatch: "#f97316",                   // orange
+    swatch: "#f97316",
     vars: {
       "--px-bg":            "#fef3ee",
       "--px-bg2":           "#fde8d8",
       "--px-surface":       "#fff8f5",
       "--px-border":        "#fb923c",
-      "--px-purple":        "#c2410c",   // header — burnt orange
-      "--px-pink":          "#f43f5e",   // tags — rose
-      "--px-mint":          "#0d9488",   // success — teal
-      "--px-yellow":        "#fcd34d",   // buttons — warm yellow
-      "--px-blue":          "#0284c7",   // links — ocean blue
-      "--px-red":           "#dc2626",   // danger
-      "--px-text":          "#431407",   // deep brown text
-      "--px-text2":         "#9a3412",   // rust secondary
+      "--px-purple":        "#c2410c",
+      "--px-pink":          "#f43f5e",
+      "--px-mint":          "#0d9488",
+      "--px-yellow":        "#fcd34d",
+      "--px-blue":          "#0284c7",
+      "--px-red":           "#dc2626",
+      "--px-text":          "#431407",
+      "--px-text2":         "#9a3412",
       "--px-rooted-bg":     "#f0fdf4",
       "--px-rooted-border": "#10b981",
       "--px-prog-bg":       "#fffbeb",
       "--px-prog-border":   "#d97706",
+    },
+  },
+
+  dracula: {
+    label: "Dracula",
+    swatch: "#bd93f9",
+    vars: {
+      "--px-bg":            "#282a36",
+      "--px-bg2":           "#1e2029",
+      "--px-surface":       "#343746",
+      "--px-border":        "#6272a4",
+      "--px-purple":        "#bd93f9",
+      "--px-pink":          "#ff79c6",
+      "--px-mint":          "#50fa7b",
+      "--px-yellow":        "#f1fa8c",
+      "--px-blue":          "#8be9fd",
+      "--px-red":           "#ff5555",
+      "--px-text":          "#f8f8f2",
+      "--px-text2":         "#6272a4",
+      "--px-rooted-bg":     "#1a3325",
+      "--px-rooted-border": "#50fa7b",
+      "--px-prog-bg":       "#2d2010",
+      "--px-prog-border":   "#f1fa8c",
+    },
+  },
+
+  cyberpunk: {
+    label: "Cyberpunk",
+    swatch: "#ff00cc",
+    vars: {
+      "--px-bg":            "#0d0221",
+      "--px-bg2":           "#160a2c",
+      "--px-surface":       "#1e1040",
+      "--px-border":        "#cc00ff",
+      "--px-purple":        "#cc00ff",
+      "--px-pink":          "#00d4ff",
+      "--px-mint":          "#39ff14",
+      "--px-yellow":        "#ffe600",
+      "--px-blue":          "#00d4ff",
+      "--px-red":           "#ff0066",
+      "--px-text":          "#f0e0ff",
+      "--px-text2":         "#aa77dd",
+      "--px-rooted-bg":     "#0a1a04",
+      "--px-rooted-border": "#39ff14",
+      "--px-prog-bg":       "#1a1400",
+      "--px-prog-border":   "#ffe600",
+    },
+  },
+
+  ocean: {
+    label: "Ocean",
+    swatch: "#1a6b9a",
+    vars: {
+      "--px-bg":            "#e8f4f8",
+      "--px-bg2":           "#d0eaf5",
+      "--px-surface":       "#f0f9ff",
+      "--px-border":        "#5ba4cf",
+      "--px-purple":        "#1a6b9a",
+      "--px-pink":          "#e94560",
+      "--px-mint":          "#2ab7a9",
+      "--px-yellow":        "#f5c842",
+      "--px-blue":          "#1a6b9a",
+      "--px-red":           "#e94560",
+      "--px-text":          "#0d2d45",
+      "--px-text2":         "#3a6d8c",
+      "--px-rooted-bg":     "#e8fff5",
+      "--px-rooted-border": "#2ab7a9",
+      "--px-prog-bg":       "#fffbec",
+      "--px-prog-border":   "#f5c842",
     },
   },
 };

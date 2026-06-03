@@ -61,6 +61,44 @@
       <span class="level-name" id="level-name">NOOB</span>
       <span class="level-xp"  id="level-xp">0 XP</span>
     </div>
+    <div class="bat-wrap">
+      <svg class="pixel-bat" viewBox="0 0 28 16" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated;display:block">
+        <rect x="11" y="8"  width="6" height="4" fill="var(--px-text)"/>
+        <rect x="12" y="5"  width="4" height="3" fill="var(--px-text)"/>
+        <rect x="12" y="3"  width="1" height="2" fill="var(--px-text)"/>
+        <rect x="15" y="3"  width="1" height="2" fill="var(--px-text)"/>
+        <rect x="12" y="6"  width="1" height="1" fill="var(--px-pink)"/>
+        <rect x="15" y="6"  width="1" height="1" fill="var(--px-pink)"/>
+        <g class="bat-wings-a">
+          <rect x="0"  y="2" width="11" height="1" fill="var(--px-text)"/>
+          <rect x="1"  y="3" width="10" height="1" fill="var(--px-text)"/>
+          <rect x="3"  y="4" width="8"  height="1" fill="var(--px-text)"/>
+          <rect x="5"  y="5" width="6"  height="1" fill="var(--px-text)"/>
+          <rect x="7"  y="6" width="4"  height="1" fill="var(--px-text)"/>
+          <rect x="9"  y="7" width="2"  height="1" fill="var(--px-text)"/>
+          <rect x="17" y="2" width="11" height="1" fill="var(--px-text)"/>
+          <rect x="17" y="3" width="10" height="1" fill="var(--px-text)"/>
+          <rect x="17" y="4" width="8"  height="1" fill="var(--px-text)"/>
+          <rect x="17" y="5" width="6"  height="1" fill="var(--px-text)"/>
+          <rect x="17" y="6" width="4"  height="1" fill="var(--px-text)"/>
+          <rect x="17" y="7" width="2"  height="1" fill="var(--px-text)"/>
+        </g>
+        <g class="bat-wings-b">
+          <rect x="9"  y="9"  width="2"  height="1" fill="var(--px-text)"/>
+          <rect x="7"  y="10" width="4"  height="1" fill="var(--px-text)"/>
+          <rect x="5"  y="11" width="6"  height="1" fill="var(--px-text)"/>
+          <rect x="3"  y="12" width="8"  height="1" fill="var(--px-text)"/>
+          <rect x="1"  y="13" width="10" height="1" fill="var(--px-text)"/>
+          <rect x="0"  y="14" width="11" height="1" fill="var(--px-text)"/>
+          <rect x="17" y="9"  width="2"  height="1" fill="var(--px-text)"/>
+          <rect x="17" y="10" width="4"  height="1" fill="var(--px-text)"/>
+          <rect x="17" y="11" width="6"  height="1" fill="var(--px-text)"/>
+          <rect x="17" y="12" width="8"  height="1" fill="var(--px-text)"/>
+          <rect x="17" y="13" width="10" height="1" fill="var(--px-text)"/>
+          <rect x="17" y="14" width="11" height="1" fill="var(--px-text)"/>
+        </g>
+      </svg>
+    </div>
   </div>
 
   <!-- ── STATS ── -->
@@ -78,13 +116,22 @@
     <span class="xp-bar-text" id="xp-bar-text">0%</span>
   </div>
 
+  <!-- ── CALENDAR ── -->
+  <div class="bar-label" style="margin-top:10px">activity // last 13 weeks</div>
+  <div id="heatmap" class="heatmap"></div>
+
   <!-- ── TOOLBAR ── -->
   <div class="toolbar">
+    <div class="search-wrap" id="search-wrap">
+      <button class="px-btn small" id="search-toggle-btn" onclick="toggleSearch()">⌕ search</button>
+      <input class="px-input search-input" id="global-search" placeholder="search machines, notes, cheatsheet, AD lab..." oninput="runSearch(this.value)" style="display:none"/>
+    </div>
     <button class="px-btn small info"    onclick="exportJSON()">export json</button>
     <label  class="px-btn small"         style="cursor:pointer">import json
       <input type="file" accept=".json"  style="display:none" onchange="importJSON(this)"/>
     </label>
   </div>
+  <div id="search-results" class="search-results" style="display:none"></div>
 
   <!-- ── TABS ── -->
   <div class="tabs">
@@ -92,6 +139,7 @@
     <div class="tab"        onclick="switchTab('skills')">skill map</div>
     <div class="tab"        onclick="switchTab('cheatsheet')">cheatsheet</div>
     <div class="tab"        onclick="switchTab('adlab')">AD lab</div>
+    <div class="tab"        onclick="switchTab('timer')">&#127813; timer</div>
     <div class="tab"        onclick="switchTab('settings')">settings</div>
   </div>
 
@@ -123,6 +171,7 @@
       </select>
       <input class="px-input" id="filter-search" placeholder="search..." oninput="renderMachines()" style="flex:1;min-width:80px"/>
       <button class="px-btn small success" onclick="openAddMachine()">+ add machine</button>
+      <button class="px-btn small"         onclick="openPicker()">&#127922; spin</button>
     </div>
 
     <div class="list-header">
@@ -165,6 +214,43 @@
     </div>
     <div class="ad-progress" id="ad-progress"></div>
     <div class="ad-lab-grid" id="ad-lab-grid"></div>
+  </div>
+
+  <!-- ══ PANEL: TIMER ══ -->
+  <div class="panel" id="panel-timer">
+    <div class="pomo-layout">
+
+      <!-- left: clock -->
+      <div class="pomo-clock-col">
+        <div class="pomo-phase-label" id="pomo-phase">work session</div>
+        <div class="pomo-display" id="pomo-display">25:00</div>
+        <div class="pomo-dots" id="pomo-dots"></div>
+        <div class="pomo-controls">
+          <button class="px-btn pomo-btn-lg" id="pomo-btn-start" onclick="pomodoroStart()">&#9654; start</button>
+          <button class="px-btn small"       onclick="pomodoroReset()">&#8635; reset</button>
+          <button class="px-btn small"       onclick="pomodoroSkip()">skip &#9197;</button>
+        </div>
+        <div class="pomo-machine-row">
+          <span style="font-size:8px;color:var(--px-text2);flex-shrink:0">working on:</span>
+          <select class="px-select" id="pomo-machine-select" onchange="pomodoroSetMachine(this.value)" style="flex:1;min-width:0"></select>
+        </div>
+        <div style="margin-top:10px;font-size:7px;color:var(--px-text2)">
+          settings: &nbsp;
+          <input type="number" class="px-input" id="pomo-cfg-work"  value="25" min="1" max="90" style="width:44px;font-size:8px;padding:3px 5px" onchange="pomodoroUpdateSettings()"/> work &nbsp;
+          <input type="number" class="px-input" id="pomo-cfg-short" value="5"  min="1" max="30" style="width:44px;font-size:8px;padding:3px 5px" onchange="pomodoroUpdateSettings()"/> short &nbsp;
+          <input type="number" class="px-input" id="pomo-cfg-long"  value="15" min="1" max="60" style="width:44px;font-size:8px;padding:3px 5px" onchange="pomodoroUpdateSettings()"/> long
+        </div>
+      </div>
+
+      <!-- right: stats -->
+      <div class="pomo-stats-col">
+        <div class="section-label" style="margin-top:0">today</div>
+        <div id="pomo-today-stats" class="pomo-today-grid"></div>
+        <div class="section-label">session log</div>
+        <div id="pomo-session-log" class="pomo-session-log"></div>
+      </div>
+
+    </div>
   </div>
 
   <!-- ══ PANEL: SETTINGS ══ -->
@@ -275,6 +361,22 @@
         <button class="px-btn small"        onclick="closeADTechModal()">cancel</button>
         <button class="px-btn small success" onclick="saveADTechModal()">save</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── RANDOM PICKER MODAL ── -->
+<div id="picker-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--px-surface);border:3px solid var(--px-text);box-shadow:6px 6px 0 var(--px-text);padding:20px;width:min(400px,92vw);font-family:'Press Start 2P',monospace;">
+    <div style="font-size:10px;color:var(--px-text2);margin-bottom:14px;border-bottom:2px dashed var(--px-border);padding-bottom:8px">// random machine //</div>
+    <div class="picker-slot" id="picker-slot">?</div>
+    <div id="picker-result" style="display:none;margin-top:10px;text-align:center">
+      <div id="picker-meta" style="font-size:8px;color:var(--px-text2);margin-top:6px;line-height:2"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:center;flex-wrap:wrap">
+      <button class="px-btn small" onclick="closePicker()">close</button>
+      <button class="px-btn small" onclick="spinPicker()">spin again</button>
+      <button class="px-btn small success" id="picker-goto" style="display:none" onclick="gotoPickedMachine()">go to machine</button>
     </div>
   </div>
 </div>

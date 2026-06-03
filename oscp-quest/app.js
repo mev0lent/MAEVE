@@ -5,6 +5,8 @@ let state = {
   statuses:      {},
   notes:         {},
   writeups:      {},
+  rootedDates:   {},
+  pomodoro:      null,
   customMachines:[],
   cheatEntries:  JSON.parse(JSON.stringify(DEFAULT_CHEATSHEET)),
   cheatFilter:   null,
@@ -25,6 +27,8 @@ let state = {
       if (p.statuses)       state.statuses       = p.statuses;
       if (p.notes)          state.notes          = p.notes;
       if (p.writeups)       state.writeups       = p.writeups || {};
+      if (p.rootedDates)    state.rootedDates    = p.rootedDates;
+      if (p.pomodoro)       state.pomodoro       = p.pomodoro;
       if (p.customMachines) state.customMachines = p.customMachines;
       if (p.adChecks)       state.adChecks       = p.adChecks;
       if (p.customADTech)   state.customADTech   = p.customADTech;
@@ -43,6 +47,8 @@ function save() {
   try {
     localStorage.setItem('oscp_quest_v2', JSON.stringify({
       statuses: state.statuses, notes: state.notes, writeups: state.writeups,
+      rootedDates: state.rootedDates,
+      pomodoro: state.pomodoro,
       customMachines: state.customMachines, cheatEntries: state.cheatEntries,
       cheatNext: state.cheatNext, adChecks: state.adChecks,
       customADTech: state.customADTech, expandedAD: state.expandedAD,
@@ -103,7 +109,7 @@ function applyTheme(name) {
 
 // ── tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(t) {
-  const names = ['machines','skills','cheatsheet','adlab','settings'];
+  const names = ['machines','skills','cheatsheet','adlab','timer','settings'];
   document.querySelectorAll('.tab').forEach((el, i) =>
     el.classList.toggle('active', names[i] === t)
   );
@@ -112,14 +118,18 @@ function switchTab(t) {
   if (t === 'skills')     renderSkills();
   if (t === 'cheatsheet') renderCheatsheet();
   if (t === 'adlab')      renderADLab();
+  if (t === 'timer')      renderPomodoro();
   if (t === 'settings')   renderSettings();
 }
 
 // ── machines ──────────────────────────────────────────────────────────────────
 function cycleStatus(id) {
-  const cur = state.statuses[id] || 'todo';
-  state.statuses[id] = cur==='todo'?'progress':cur==='progress'?'rooted':'todo';
-  save(); renderMachines(); renderStats();
+  const cur  = state.statuses[id] || 'todo';
+  const next = cur==='todo'?'progress':cur==='progress'?'rooted':'todo';
+  state.statuses[id] = next;
+  if (next === 'rooted' && !state.rootedDates[id])
+    state.rootedDates[id] = new Date().toISOString().slice(0, 10);
+  save(); renderMachines(); renderStats(); renderCalendar();
 }
 
 function getFiltered() {
@@ -535,6 +545,8 @@ function exportJSON() {
   download(JSON.stringify({
     version:3, exportedAt:new Date().toISOString(),
     statuses:state.statuses, notes:state.notes, writeups:state.writeups,
+    rootedDates:state.rootedDates,
+    pomodoro:state.pomodoro,
     customMachines:state.customMachines, cheatEntries:state.cheatEntries,
     cheatNext:state.cheatNext, adChecks:state.adChecks,
     customADTech:state.customADTech, settings:state.settings,
@@ -550,6 +562,8 @@ function importJSON(input) {
       if (d.statuses)       state.statuses       = d.statuses;
       if (d.notes)          state.notes          = d.notes;
       if (d.writeups)       state.writeups       = d.writeups;
+      if (d.rootedDates)    state.rootedDates    = d.rootedDates;
+      if (d.pomodoro)       state.pomodoro       = d.pomodoro;
       if (d.customMachines) state.customMachines = d.customMachines;
       if (d.adChecks)       state.adChecks       = d.adChecks;
       if (d.customADTech)   state.customADTech   = d.customADTech;
@@ -694,6 +708,483 @@ function updateGreeting() {
   el.textContent = prefix + quote;
 }
 
+// ── pomodoro timer ────────────────────────────────────────────────────────────
+let _pomoInterval = null;
+
+function _pomoState() {
+  if (!state.pomodoro) {
+    state.pomodoro = {
+      sessions: [],
+      settings: { work: 25, shortBreak: 5, longBreak: 15 },
+      timer: {
+        phase: 'work', remaining: 25 * 60, running: false,
+        startedAt: null, sessionCount: 0,
+        currentMachineId: null, currentMachineName: null,
+        sessionStartedAt: null,
+      },
+    };
+  }
+  return state.pomodoro;
+}
+
+function _phaseSecs(phase) {
+  const s = _pomoState().settings;
+  if (phase === 'shortBreak') return s.shortBreak * 60;
+  if (phase === 'longBreak')  return s.longBreak  * 60;
+  return s.work * 60;
+}
+
+function _fmt(secs) {
+  return String(Math.floor(secs / 60)).padStart(2,'0') + ':' + String(secs % 60).padStart(2,'0');
+}
+
+function _pomoFlash() {
+  const el = document.getElementById('pomo-display');
+  if (!el) return;
+  el.classList.add('flash');
+  setTimeout(() => { el.classList.remove('flash'); renderPomodoro(); }, 900);
+}
+
+function _pomoNotify(msg) {
+  _pomoFlash();
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    new Notification('MAEVE // timer', { body: msg });
+  }
+}
+
+function _pomoTick() {
+  const p = _pomoState(); const t = p.timer;
+  if (!t.running) return;
+  t.remaining = Math.max(0, t.remaining - 1);
+  if (t.remaining <= 0) {
+    if (t.phase === 'work') {
+      _pomoRecordSession();
+      t.sessionCount = (t.sessionCount + 1) % 4;
+      t.phase     = t.sessionCount === 0 ? 'longBreak' : 'shortBreak';
+      t.remaining = _phaseSecs(t.phase);
+      t.running   = false; t.startedAt = null; t.sessionStartedAt = null;
+      save(); renderPomodoro(); renderCalendar();
+      _pomoNotify('work done! take a break.');
+    } else {
+      t.phase = 'work'; t.remaining = _phaseSecs('work');
+      t.running = false; t.startedAt = null;
+      save(); renderPomodoro();
+      _pomoNotify('break over — back to it!');
+    }
+    clearInterval(_pomoInterval); _pomoInterval = null;
+  } else {
+    _updateDisplayOnly();
+    if (t.remaining % 30 === 0) save();
+  }
+}
+
+function _updateDisplayOnly() {
+  const t = _pomoState().timer;
+  const el = document.getElementById('pomo-display');
+  if (el && !el.classList.contains('flash')) el.textContent = _fmt(t.remaining);
+  const btn = document.getElementById('pomo-btn-start');
+  if (btn) btn.textContent = t.running ? '⏸ pause' : '▶ start';
+}
+
+function _pomoRecordSession() {
+  const p = _pomoState(); const t = p.timer;
+  p.sessions.push({
+    id:          Date.now(),
+    type:        'work',
+    machineId:   t.currentMachineId   || null,
+    machineName: t.currentMachineName || null,
+    startedAt:   t.sessionStartedAt   || new Date().toISOString(),
+    endedAt:     new Date().toISOString(),
+    duration:    p.settings.work,
+    completed:   true,
+  });
+}
+
+// ── public API ────────────────────────────────────────────────────────────────
+function pomodoroInit() {
+  const p = _pomoState(); const t = p.timer;
+  // restore settings into config inputs (if DOM exists yet)
+  const cfgW = document.getElementById('pomo-cfg-work');
+  const cfgS = document.getElementById('pomo-cfg-short');
+  const cfgL = document.getElementById('pomo-cfg-long');
+  if (cfgW) cfgW.value = p.settings.work;
+  if (cfgS) cfgS.value = p.settings.shortBreak;
+  if (cfgL) cfgL.value = p.settings.longBreak;
+
+  if (t.running && t.startedAt) {
+    const elapsed = Math.floor((Date.now() - t.startedAt) / 1000);
+    t.remaining = Math.max(0, t.remaining - elapsed);
+    t.startedAt = Date.now();
+    if (t.remaining <= 0) {
+      t.running = false; t.startedAt = null;
+      save();
+    } else {
+      if (_pomoInterval) clearInterval(_pomoInterval);
+      _pomoInterval = setInterval(_pomoTick, 1000);
+    }
+  }
+}
+
+function pomodoroStart() {
+  const t = _pomoState().timer;
+  if (t.running) {
+    clearInterval(_pomoInterval); _pomoInterval = null;
+    const elapsed = Math.floor((Date.now() - t.startedAt) / 1000);
+    t.remaining = Math.max(0, t.remaining - elapsed);
+    t.running = false; t.startedAt = null;
+    save(); renderPomodoro();
+  } else {
+    if (t.phase === 'work' && !t.sessionStartedAt)
+      t.sessionStartedAt = new Date().toISOString();
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default')
+      Notification.requestPermission();
+    t.running = true; t.startedAt = Date.now();
+    if (_pomoInterval) clearInterval(_pomoInterval);
+    _pomoInterval = setInterval(_pomoTick, 1000);
+    save(); renderPomodoro();
+  }
+}
+
+function pomodoroReset() {
+  const t = _pomoState().timer;
+  clearInterval(_pomoInterval); _pomoInterval = null;
+  t.remaining = _phaseSecs(t.phase);
+  t.running = false; t.startedAt = null; t.sessionStartedAt = null;
+  save(); renderPomodoro();
+}
+
+function pomodoroSkip() {
+  const t = _pomoState().timer;
+  clearInterval(_pomoInterval); _pomoInterval = null;
+  if (t.phase === 'work') {
+    t.sessionCount = (t.sessionCount + 1) % 4;
+    t.phase = t.sessionCount === 0 ? 'longBreak' : 'shortBreak';
+  } else {
+    t.phase = 'work';
+  }
+  t.remaining = _phaseSecs(t.phase);
+  t.running = false; t.startedAt = null; t.sessionStartedAt = null;
+  save(); renderPomodoro();
+}
+
+function pomodoroSetMachine(id) {
+  const t = _pomoState().timer;
+  t.currentMachineId = id || null;
+  if (id) {
+    const m = allMachines().find(m => m.id === id);
+    t.currentMachineName = m ? m.name : null;
+  } else {
+    t.currentMachineName = null;
+  }
+  save();
+}
+
+function pomodoroUpdateSettings() {
+  const p = _pomoState();
+  const w = parseInt(document.getElementById('pomo-cfg-work')?.value)  || 25;
+  const s = parseInt(document.getElementById('pomo-cfg-short')?.value) || 5;
+  const l = parseInt(document.getElementById('pomo-cfg-long')?.value)  || 15;
+  p.settings = { work: w, shortBreak: s, longBreak: l };
+  if (!_pomoState().timer.running) {
+    const t = _pomoState().timer;
+    t.remaining = _phaseSecs(t.phase);
+  }
+  save(); renderPomodoro();
+}
+
+function renderPomodoro() {
+  const p = _pomoState(); const t = p.timer;
+
+  const displayEl = document.getElementById('pomo-display');
+  const phaseEl   = document.getElementById('pomo-phase');
+  const startBtn  = document.getElementById('pomo-btn-start');
+  if (!displayEl) return;
+
+  if (!displayEl.classList.contains('flash')) displayEl.textContent = _fmt(t.remaining);
+
+  const cls = t.running
+    ? (t.phase === 'work' ? 'running' : 'on-break')
+    : '';
+  displayEl.className = 'pomo-display' + (cls ? ' ' + cls : '');
+
+  const phaseNames = { work:'work session', shortBreak:'short break', longBreak:'long break — stretch!' };
+  if (phaseEl) phaseEl.textContent = phaseNames[t.phase] || t.phase;
+  if (startBtn) startBtn.textContent = t.running ? '⏸ pause' : '▶ start';
+
+  const dotsEl = document.getElementById('pomo-dots');
+  if (dotsEl) dotsEl.innerHTML = [0,1,2,3].map(i =>
+    `<div class="pomo-dot ${i < t.sessionCount ? 'filled' : ''}"></div>`
+  ).join('');
+
+  const sel = document.getElementById('pomo-machine-select');
+  if (sel) {
+    const candidates = allMachines().filter(m => (state.statuses[m.id]||'todo') !== 'rooted');
+    sel.innerHTML = '<option value="">— free session —</option>' +
+      candidates.map(m => `<option value="${m.id}"${t.currentMachineId===m.id?' selected':''}>${escHtml(m.name)}</option>`).join('');
+  }
+
+  const cfgW = document.getElementById('pomo-cfg-work');
+  const cfgS = document.getElementById('pomo-cfg-short');
+  const cfgL = document.getElementById('pomo-cfg-long');
+  if (cfgW && !cfgW.matches(':focus')) cfgW.value = p.settings.work;
+  if (cfgS && !cfgS.matches(':focus')) cfgS.value = p.settings.shortBreak;
+  if (cfgL && !cfgL.matches(':focus')) cfgL.value = p.settings.longBreak;
+
+  _renderPomodoroStats();
+}
+
+function _renderPomodoroStats() {
+  const p       = _pomoState();
+  const todayEl = document.getElementById('pomo-today-stats');
+  const logEl   = document.getElementById('pomo-session-log');
+  if (!todayEl || !logEl) return;
+
+  const today    = new Date().toISOString().slice(0, 10);
+  const allWork  = p.sessions.filter(s => s.type === 'work' && s.completed);
+  const todayW   = allWork.filter(s => s.startedAt?.slice(0, 10) === today);
+  const todayMin = todayW.reduce((n, s) => n + s.duration, 0);
+  const todayMac = new Set(todayW.map(s => s.machineId).filter(Boolean)).size;
+  const allMin   = allWork.reduce((n, s) => n + s.duration, 0);
+  const allHrs   = (allMin / 60).toFixed(1);
+
+  todayEl.innerHTML = `
+    <div class="pomo-stat-card"><span class="pomo-stat-num">${todayW.length}</span><span class="pomo-stat-label">today</span></div>
+    <div class="pomo-stat-card"><span class="pomo-stat-num">${todayMin}m</span><span class="pomo-stat-label">focused</span></div>
+    <div class="pomo-stat-card"><span class="pomo-stat-num">${allHrs}h</span><span class="pomo-stat-label">all time</span></div>
+  `;
+
+  const recent = allWork.slice().reverse().slice(0, 30);
+  if (!recent.length) {
+    logEl.innerHTML = '<div class="empty-state">no sessions yet<br/>start your first pomodoro!</div>';
+    return;
+  }
+  logEl.innerHTML = recent.map(s => {
+    const dt = s.startedAt ? s.startedAt.slice(0, 10) + ' ' + s.startedAt.slice(11, 16) : '—';
+    return `<div class="pomo-session-row">
+      <span class="pomo-s-time">${dt}</span>
+      <span class="pomo-s-machine">${s.machineName ? escHtml(s.machineName) : '— free —'}</span>
+      <span class="pomo-s-dur">${s.duration}m</span>
+    </div>`;
+  }).join('');
+}
+
+// ── progress calendar ─────────────────────────────────────────────────────────
+function renderCalendar() {
+  const el = document.getElementById('heatmap');
+  if (!el) return;
+
+  const counts = {};
+  Object.values(state.rootedDates).forEach(d => { counts[d] = (counts[d] || 0) + 1; });
+  if (state.pomodoro) {
+    state.pomodoro.sessions.forEach(s => {
+      if (s.type === 'work' && s.completed && s.startedAt) {
+        const d = s.startedAt.slice(0, 10);
+        counts[d] = (counts[d] || 0) + 1;
+      }
+    });
+  }
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // exactly 91 cells = 13 columns × 7 rows, newest cell = today
+  const cells = [];
+  for (let i = 90; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    cells.push({ ds, count: counts[ds] || 0 });
+  }
+
+  const colorFor = count => {
+    if (count === 0) return 'var(--px-bg2)';
+    if (count === 1) return 'var(--px-purple)';
+    if (count === 2) return '#8844d8';
+    return '#5c1faa';
+  };
+
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  el.innerHTML = weeks.map(week =>
+    `<div class="heatmap-week">${week.map(c =>
+      `<div class="cal-cell" style="background:${colorFor(c.count)}"
+            title="${c.ds}${c.count ? ' // ' + c.count + ' rooted' : ''}"></div>`
+    ).join('')}</div>`
+  ).join('');
+}
+
+// ── random machine picker ─────────────────────────────────────────────────────
+let _pickedMachine = null;
+
+function openPicker() {
+  const eligible = allMachines().filter(m => (state.statuses[m.id] || 'todo') !== 'rooted');
+  if (!eligible.length) { alert('all machines rooted! legend.'); return; }
+  document.getElementById('picker-overlay').style.display = 'flex';
+  spinPicker();
+}
+
+function closePicker() {
+  document.getElementById('picker-overlay').style.display = 'none';
+}
+
+function spinPicker() {
+  const eligible = allMachines().filter(m => (state.statuses[m.id] || 'todo') !== 'rooted');
+  if (!eligible.length) return;
+  _pickedMachine = eligible[Math.floor(Math.random() * eligible.length)];
+
+  const slotEl   = document.getElementById('picker-slot');
+  const resultEl = document.getElementById('picker-result');
+  const gotoBtn  = document.getElementById('picker-goto');
+
+  resultEl.style.display = 'none';
+  gotoBtn.style.display  = 'none';
+  slotEl.classList.add('spinning');
+
+  let i = 0;
+  const iv = setInterval(() => {
+    slotEl.textContent = eligible[i++ % eligible.length].name;
+  }, 55);
+
+  setTimeout(() => {
+    clearInterval(iv);
+    slotEl.classList.remove('spinning');
+    slotEl.textContent = _pickedMachine.name;
+    document.getElementById('picker-meta').textContent =
+      _pickedMachine.platform + ' // ' + _pickedMachine.os + ' // ' + _pickedMachine.diff;
+    resultEl.style.display = 'block';
+    gotoBtn.style.display  = 'inline-block';
+  }, 1400);
+}
+
+function gotoPickedMachine() {
+  if (!_pickedMachine) return;
+  closePicker();
+  ['filter-platform','filter-os','filter-diff','filter-status'].forEach(id =>
+    document.getElementById(id).value = ''
+  );
+  document.getElementById('filter-search').value = '';
+  switchTab('machines');
+  renderMachines();
+  setTimeout(() => {
+    const row = document.getElementById('row-' + _pickedMachine.id);
+    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 80);
+}
+
+// ── full-text search ──────────────────────────────────────────────────────────
+function toggleSearch() {
+  const input = document.getElementById('global-search');
+  const btn   = document.getElementById('search-toggle-btn');
+  const open  = input.style.display === 'none';
+  input.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '✕ close' : '⌕ search';
+  if (!open) {
+    input.value = '';
+    document.getElementById('search-results').style.display = 'none';
+  } else {
+    input.focus();
+  }
+}
+
+function getSnippet(text, q) {
+  const idx = text.toLowerCase().indexOf(q);
+  if (idx === -1) return text.slice(0, 90);
+  const s = Math.max(0, idx - 28), e = Math.min(text.length, idx + q.length + 52);
+  return (s > 0 ? '…' : '') + text.slice(s, e) + (e < text.length ? '…' : '');
+}
+
+function hlMatch(str, q) {
+  const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  return str.replace(re, '<mark class="search-mark">$1</mark>');
+}
+
+function runSearch(raw) {
+  const resultsEl = document.getElementById('search-results');
+  const q = raw.trim().toLowerCase();
+  if (!q) { resultsEl.style.display = 'none'; return; }
+
+  const hits = [];
+
+  allMachines().forEach(m => {
+    const inName  = m.name.toLowerCase().includes(q);
+    const inTags  = m.tags.join(' ').toLowerCase().includes(q);
+    const inNote  = (state.notes[m.id] || '').toLowerCase().includes(q);
+    if (!inName && !inTags && !inNote) return;
+    hits.push({
+      type: 'machine', id: m.id, title: m.name,
+      sub: m.platform + ' // ' + m.diff,
+      snippet: inNote ? getSnippet(state.notes[m.id], q) : (inTags ? m.tags.join(', ') : ''),
+    });
+  });
+
+  state.cheatEntries.forEach(e => {
+    const inTitle   = e.title.toLowerCase().includes(q);
+    const inContent = e.content.toLowerCase().includes(q);
+    if (!inTitle && !inContent) return;
+    hits.push({
+      type: 'cheat', id: String(e.id), title: e.title,
+      sub: 'cheatsheet // ' + e.tags.join(', '),
+      snippet: inContent ? getSnippet(e.content, q) : '',
+    });
+  });
+
+  allADTech().forEach(a => {
+    const inName = a.name.toLowerCase().includes(q);
+    const inDesc = a.desc.toLowerCase().includes(q);
+    const inCmd  = a.cmd.toLowerCase().includes(q);
+    if (!inName && !inDesc && !inCmd) return;
+    hits.push({
+      type: 'adtech', id: a.id, title: a.name,
+      sub: 'AD lab',
+      snippet: inDesc ? a.desc : (inCmd ? getSnippet(a.cmd, q) : ''),
+    });
+  });
+
+  if (!hits.length) {
+    resultsEl.innerHTML = `<div class="search-empty">no results for "${escHtml(raw)}"</div>`;
+    resultsEl.style.display = 'block';
+    return;
+  }
+
+  resultsEl.innerHTML = hits.slice(0, 12).map(r =>
+    `<div class="search-result-item" onclick="jumpToResult('${r.type}','${escHtml(r.id)}')">
+       <div class="search-result-title">${hlMatch(escHtml(r.title), q)}</div>
+       <div class="search-result-sub">${escHtml(r.sub)}</div>
+       ${r.snippet ? `<div class="search-result-snippet">${hlMatch(escHtml(r.snippet), q)}</div>` : ''}
+     </div>`
+  ).join('');
+  resultsEl.style.display = 'block';
+}
+
+function jumpToResult(type, rawId) {
+  document.getElementById('search-results').style.display = 'none';
+  document.getElementById('global-search').value = '';
+  document.getElementById('search-toggle-btn').textContent = '⌕ search';
+  document.getElementById('global-search').style.display = 'none';
+
+  if (type === 'machine') {
+    ['filter-platform','filter-os','filter-diff','filter-status'].forEach(id =>
+      document.getElementById(id).value = ''
+    );
+    document.getElementById('filter-search').value = '';
+    switchTab('machines'); renderMachines();
+    setTimeout(() => {
+      const row = document.getElementById('row-' + rawId);
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  } else if (type === 'cheat') {
+    const id = isNaN(rawId) ? rawId : Number(rawId);
+    state.expandedCheat = id;
+    switchTab('cheatsheet');
+    setTimeout(() => {
+      const el = document.querySelector(`[data-cheat="${id}"]`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  } else if (type === 'adtech') {
+    state.expandedAD = rawId;
+    switchTab('adlab');
+  }
+}
+
 // ── init ──────────────────────────────────────────────────────────────────────
 if (typeof marked !== 'undefined') marked.setOptions({ breaks: true, gfm: true });
 
@@ -701,8 +1192,15 @@ applyTheme(state.settings.theme || 'pastel');
 updateGreeting();
 renderMachines();
 renderStats();
+renderCalendar();
+pomodoroInit();
 
 document.addEventListener('click', e => {
-  const wrap = document.getElementById('tag-drop-wrap');
-  if (wrap && !wrap.contains(e.target)) wrap.classList.remove('open');
+  const tagWrap    = document.getElementById('tag-drop-wrap');
+  if (tagWrap && !tagWrap.contains(e.target)) tagWrap.classList.remove('open');
+
+  const searchWrap = document.getElementById('search-wrap');
+  const resultsEl  = document.getElementById('search-results');
+  if (searchWrap && resultsEl && !searchWrap.contains(e.target) && !resultsEl.contains(e.target))
+    resultsEl.style.display = 'none';
 });
