@@ -129,7 +129,7 @@ function cycleStatus(id) {
   state.statuses[id] = next;
   if (next === 'rooted' && !state.rootedDates[id])
     state.rootedDates[id] = new Date().toISOString().slice(0, 10);
-  save(); renderMachines(); renderStats(); renderCalendar();
+  save(); renderMachines(); renderStats(); renderCountdown();
 }
 
 function getFiltered() {
@@ -763,7 +763,7 @@ function _pomoTick() {
       t.phase     = t.sessionCount === 0 ? 'longBreak' : 'shortBreak';
       t.remaining = _phaseSecs(t.phase);
       t.running   = false; t.startedAt = null; t.sessionStartedAt = null;
-      save(); renderPomodoro(); renderCalendar();
+      save(); renderPomodoro(); renderCountdown();
       _pomoNotify('work done! take a break.');
     } else {
       t.phase = 'work'; t.remaining = _phaseSecs('work');
@@ -968,48 +968,90 @@ function _renderPomodoroStats() {
   }).join('');
 }
 
-// ── progress calendar ─────────────────────────────────────────────────────────
-function renderCalendar() {
-  const el = document.getElementById('heatmap');
+// ── exam countdown ────────────────────────────────────────────────────────────
+function renderCountdown() {
+  const el = document.getElementById('countdown-widget');
   if (!el) return;
 
-  const counts = {};
-  Object.values(state.rootedDates).forEach(d => { counts[d] = (counts[d] || 0) + 1; });
-  if (state.pomodoro) {
-    state.pomodoro.sessions.forEach(s => {
-      if (s.type === 'work' && s.completed && s.startedAt) {
-        const d = s.startedAt.slice(0, 10);
-        counts[d] = (counts[d] || 0) + 1;
-      }
-    });
+  const goalDate = state.settings.goalDate;
+  if (!goalDate) {
+    el.innerHTML = '<div class="cdown-no-date">no exam date set — add one in settings to track your pace</div>';
+    return;
   }
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  const goal  = new Date(goalDate + 'T00:00:00');
+  const daysLeft = Math.round((goal - today) / 86400000);
 
-  // exactly 91 cells = 13 columns × 7 rows, newest cell = today
-  const cells = [];
-  for (let i = 90; i >= 0; i--) {
-    const d = new Date(today); d.setDate(d.getDate() - i);
-    const ds = d.toISOString().slice(0, 10);
-    cells.push({ ds, count: counts[ds] || 0 });
+  if (daysLeft === 0) {
+    el.innerHTML = '<div class="cdown-exam-day">// EXAM DAY — you got this! //</div>';
+    return;
+  }
+  if (daysLeft < 0) {
+    el.innerHTML = '<div class="cdown-no-date">exam date passed — update your goal date in settings</div>';
+    return;
   }
 
-  const colorFor = count => {
-    if (count === 0) return 'var(--px-bg2)';
-    if (count === 1) return 'var(--px-purple)';
-    if (count === 2) return '#8844d8';
-    return '#5c1faa';
-  };
+  const weeksLeft = daysLeft / 7;
+  const wFull = Math.floor(daysLeft / 7);
+  const dRem  = daysLeft % 7;
 
-  const weeks = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  const machines  = allMachines();
+  const total     = machines.length;
+  const rooted    = machines.filter(m => state.statuses[m.id] === 'rooted').length;
+  const remaining = total - rooted;
 
-  el.innerHTML = weeks.map(week =>
-    `<div class="heatmap-week">${week.map(c =>
-      `<div class="cal-cell" style="background:${colorFor(c.count)}"
-            title="${c.ds}${c.count ? ' // ' + c.count + ' rooted' : ''}"></div>`
-    ).join('')}</div>`
-  ).join('');
+  // current pace: boxes rooted in the last 28 days → per-week average
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() - 28);
+  const cutoffStr    = cutoff.toISOString().slice(0, 10);
+  const recentCount  = Object.values(state.rootedDates).filter(d => d >= cutoffStr).length;
+  const currentPace  = +(recentCount / 4).toFixed(1);
+  const requiredPace = weeksLeft > 0 ? +(remaining / weeksLeft).toFixed(1) : 0;
+
+  let statusCls, statusText;
+  if (remaining === 0) {
+    statusCls = 'cdown-status-ahead';  statusText = 'COMPLETE';
+  } else if (currentPace === 0) {
+    statusCls = 'cdown-status-behind'; statusText = 'GET GOING';
+  } else if (currentPace >= requiredPace * 1.15) {
+    statusCls = 'cdown-status-ahead';  statusText = 'AHEAD';
+  } else if (currentPace >= requiredPace * 0.85) {
+    statusCls = 'cdown-status-track';  statusText = 'ON TRACK';
+  } else {
+    statusCls = 'cdown-status-behind'; statusText = 'BEHIND';
+  }
+
+  el.innerHTML = `
+    <div class="cdown-days-col">
+      <span class="cdown-big">${daysLeft}</span>
+      <span class="cdown-sub">days left</span>
+      <span class="cdown-weeks">${wFull}w ${dRem}d</span>
+    </div>
+    <div class="cdown-sep"></div>
+    <div class="cdown-mid">
+      <div class="cdown-item">
+        <span class="cdown-val">${rooted}<span class="cdown-of">/${total}</span></span>
+        <span class="cdown-label">rooted</span>
+      </div>
+      <div class="cdown-item">
+        <span class="cdown-val">${remaining}</span>
+        <span class="cdown-label">left</span>
+      </div>
+    </div>
+    <div class="cdown-sep"></div>
+    <div class="cdown-mid">
+      <div class="cdown-item">
+        <span class="cdown-val">${requiredPace}<span class="cdown-of">/wk</span></span>
+        <span class="cdown-label">needed</span>
+      </div>
+      <div class="cdown-item">
+        <span class="cdown-val">${currentPace}<span class="cdown-of">/wk</span></span>
+        <span class="cdown-label">your pace</span>
+      </div>
+    </div>
+    <div class="cdown-sep"></div>
+    <div class="cdown-status ${statusCls}">${statusText}</div>`;
 }
 
 // ── random machine picker ─────────────────────────────────────────────────────
@@ -1192,7 +1234,7 @@ applyTheme(state.settings.theme || 'pastel');
 updateGreeting();
 renderMachines();
 renderStats();
-renderCalendar();
+renderCountdown();
 pomodoroInit();
 
 document.addEventListener('click', e => {
