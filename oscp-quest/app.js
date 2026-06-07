@@ -6,6 +6,8 @@ let state = {
   notes:         {},
   writeups:      {},
   rootedDates:   {},
+  stuckNotes:    {},
+  rootCount:     {},
   pomodoro:      null,
   customMachines:[],
   cheatEntries:  JSON.parse(JSON.stringify(DEFAULT_CHEATSHEET)),
@@ -28,6 +30,8 @@ let state = {
       if (p.notes)          state.notes          = p.notes;
       if (p.writeups)       state.writeups       = p.writeups || {};
       if (p.rootedDates)    state.rootedDates    = p.rootedDates;
+      if (p.stuckNotes)     state.stuckNotes     = p.stuckNotes;
+      if (p.rootCount)      state.rootCount      = p.rootCount;
       if (p.pomodoro)       state.pomodoro       = p.pomodoro;
       if (p.customMachines) state.customMachines = p.customMachines;
       if (p.adChecks)       state.adChecks       = p.adChecks;
@@ -47,7 +51,7 @@ function save() {
   try {
     localStorage.setItem('oscp_quest_v2', JSON.stringify({
       statuses: state.statuses, notes: state.notes, writeups: state.writeups,
-      rootedDates: state.rootedDates,
+      rootedDates: state.rootedDates, stuckNotes: state.stuckNotes, rootCount: state.rootCount,
       pomodoro: state.pomodoro,
       customMachines: state.customMachines, cheatEntries: state.cheatEntries,
       cheatNext: state.cheatNext, adChecks: state.adChecks,
@@ -88,7 +92,9 @@ const previewCheat = new Set();
 function calcXP() {
   const machXP = allMachines().reduce((xp, m) => {
     if (state.statuses[m.id] !== 'rooted') return xp;
-    return xp + (XP_TABLE[m.diff] || 0) + (m.isAD ? AD_BONUS : 0);
+    const base    = (XP_TABLE[m.diff] || 0) + (m.isAD ? AD_BONUS : 0);
+    const mastery = (state.rootCount[m.id] || 0) >= 2 ? MASTERY_BONUS : 0;
+    return xp + base + mastery;
   }, 0);
   const adXP = allADTech().filter(a => state.adChecks[a.id]).length * AD_TECH_XP;
   return machXP + adXP;
@@ -124,13 +130,26 @@ function switchTab(t) {
 
 // ── machines ──────────────────────────────────────────────────────────────────
 function cycleStatus(id) {
-  const cur  = state.statuses[id] || 'todo';
-  const next = cur==='todo'?'progress':cur==='progress'?'rooted':'todo';
+  const cur = state.statuses[id] || 'todo';
+  let next;
+  if (cur === 'stuck') next = 'progress';
+  else next = cur === 'todo' ? 'progress' : cur === 'progress' ? 'rooted' : 'todo';
+
+  if (next === 'rooted') {
+    state.rootCount[id] = (state.rootCount[id] || 0) + 1;
+    if (!state.rootedDates[id])
+      state.rootedDates[id] = new Date().toISOString().slice(0, 10);
+  }
   state.statuses[id] = next;
-  if (next === 'rooted' && !state.rootedDates[id])
-    state.rootedDates[id] = new Date().toISOString().slice(0, 10);
   save(); renderMachines(); renderStats(); renderCountdown();
 }
+
+function markStuck(id) {
+  state.statuses[id] = 'stuck';
+  save(); renderMachines(); renderStats(); renderCountdown();
+}
+
+function saveStuckNote(id, val) { state.stuckNotes[id] = val; save(); }
 
 function getFiltered() {
   const plat = document.getElementById('filter-platform').value;
@@ -159,25 +178,38 @@ function renderMachines() {
 
   list.innerHTML = filtered.map(m => {
     const st       = state.statuses[m.id] || 'todo';
-    const dotClass = st==='rooted'?'dot-rooted':st==='progress'?'dot-progress':'dot-todo';
-    const rowClass = st==='rooted'?'rooted':st==='progress'?'in-progress':'';
-    const stText   = st==='rooted'?'ROOTED':st==='progress'?'IN PROG':'TODO';
+    const rc       = state.rootCount[m.id] || 0;
+    const mastered = rc >= 2;
+    const dotClass = st==='rooted'?'dot-rooted':st==='progress'?'dot-progress':st==='stuck'?'dot-stuck':'dot-todo';
+    const rowClass = st==='rooted'?'rooted':st==='progress'?'in-progress':st==='stuck'?'stuck':'';
+    const stText   = st==='rooted'?(mastered?'MASTERED':'ROOTED'):st==='progress'?'IN PROG':st==='stuck'?'STUCK':'TODO';
     const platCls  = 'badge-'+m.platform.toLowerCase();
     const osCls    = m.isAD?'badge-ad':'badge-'+(m.os==='Linux'?'linux':'windows');
     const diffCls  = 'badge-'+m.diff.toLowerCase();
     const writeup  = (state.writeups[m.id]||'').replace(/"/g,'&quot;');
     const isCustom = !!m.custom;
 
-    const tagsHtml = st==='rooted'
+    const tagsHtml = (st==='rooted'||st==='stuck')
       ? m.tags.slice(0,3).map(t=>`<span class="tag" style="cursor:default">${t}</span>`).join('')
       : '<span class="tag-spoiler">[ hidden ]</span>';
 
-    const editBtn = isCustom ? `<button class="px-btn small" onclick="openEditMachine('${m.id}')">edit</button>` : '';
+    const stuckBtn  = st==='progress' ? `<button class="px-btn small danger" onclick="markStuck('${m.id}')" title="couldn't solve it — mark for revisit">✗ stuck</button>` : '';
+    const rcBadge   = rc >= 2 ? `<span class="rc-badge" title="rooted ${rc} times">×${rc}</span>` : '';
+    const editBtn   = isCustom ? `<button class="px-btn small" onclick="openEditMachine('${m.id}')">edit</button>` : '';
+
+    const stuckNoteHtml = st === 'stuck' ? `
+      <div class="stuck-note-section">
+        <label class="note-field-label stuck-note-label">what i learned from this attempt</label>
+        <textarea class="note-area stuck-note-area" id="sn-${m.id}"
+                  placeholder="what techniques did i try?&#10;what was i missing?&#10;what should i study before retrying?"
+                  onchange="saveStuckNote('${m.id}',this.value)">${escHtml(state.stuckNotes[m.id]||'')}</textarea>
+      </div>` : '';
 
     return `<div class="machine-row ${rowClass}" id="row-${m.id}">
       <div class="status-col">
         <div class="status-dot ${dotClass}" onclick="cycleStatus('${m.id}')" title="click to advance"></div>
         <span class="status-text st-${st}">${stText}</span>
+        ${rcBadge}
       </div>
       <div>
         <div class="machine-name">${escHtml(m.name)}${isCustom?'<span class="custom-badge">[custom]</span>':''}</div>
@@ -189,10 +221,11 @@ function renderMachines() {
       <div class="tags-col">${tagsHtml}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="px-btn small" onclick="toggleNote('${m.id}')">notes ▼</button>
-        ${editBtn}
+        ${stuckBtn}${editBtn}
       </div>
     </div>
     <div class="note-panel" id="note-${m.id}">
+      ${stuckNoteHtml}
       <label class="note-field-label">writeup</label>
       <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
         <input class="px-input" style="flex:1" placeholder="https://..."
@@ -329,23 +362,29 @@ function deleteMachineModal() {
 
 // ── stats ─────────────────────────────────────────────────────────────────────
 function renderStats() {
-  const machines = allMachines();
-  const total    = machines.length;
-  const rooted   = machines.filter(m => state.statuses[m.id]==='rooted').length;
-  const inprog   = machines.filter(m => state.statuses[m.id]==='progress').length;
-  const adRooted = machines.filter(m => m.isAD && state.statuses[m.id]==='rooted').length;
-  const adTotal  = machines.filter(m => m.isAD).length;
-  const xp       = calcXP();
+  const machines  = allMachines();
+  const total     = machines.length;
+  const rooted    = machines.filter(m => state.statuses[m.id]==='rooted').length;
+  const inprog    = machines.filter(m => state.statuses[m.id]==='progress').length;
+  const stuck     = machines.filter(m => state.statuses[m.id]==='stuck').length;
+  const mastered  = machines.filter(m => (state.rootCount[m.id]||0) >= 2).length;
+  const adRooted  = machines.filter(m => m.isAD && state.statuses[m.id]==='rooted').length;
+  const adTotal   = machines.filter(m => m.isAD).length;
+  const xp        = calcXP();
   const { lv, idx } = getLevelInfo(xp);
-  const nextLv   = LEVELS[Math.min(idx+1, LEVELS.length-1)];
-  const lvPct    = lv.name==='OSCP READY'
+  const nextLv    = LEVELS[Math.min(idx+1, LEVELS.length-1)];
+  const lvPct     = lv.name==='OSCP READY'
     ? 100
     : Math.min(100, Math.round(((xp-lv.min)/(nextLv.min-lv.min))*100));
 
   document.getElementById('stats-bar').innerHTML = `
-    <div class="stat-card"><span class="stat-num">${rooted}</span><span class="stat-label">rooted</span></div>
+    <div class="stat-card">
+      <span class="stat-num">${rooted}</span>
+      <span class="stat-label">rooted</span>
+      ${mastered > 0 ? `<span style="font-size:7px;color:var(--px-mint);margin-top:2px">${mastered} mastered</span>` : ''}
+    </div>
     <div class="stat-card"><span class="stat-num">${inprog}</span><span class="stat-label">in progress</span></div>
-    <div class="stat-card"><span class="stat-num">${total-rooted-inprog}</span><span class="stat-label">todo</span></div>
+    <div class="stat-card"><span class="stat-num" style="color:var(--px-red)">${stuck}</span><span class="stat-label">stuck</span></div>
     <div class="stat-card"><span class="stat-num">${adRooted}/${adTotal}</span><span class="stat-label">AD boxes</span></div>
     <div class="stat-card"><span class="stat-num">${xp}</span><span class="stat-label">total XP</span></div>
   `;
@@ -973,54 +1012,76 @@ function renderCountdown() {
   const el = document.getElementById('countdown-widget');
   if (!el) return;
 
-  const goalDate = state.settings.goalDate;
-  if (!goalDate) {
-    el.innerHTML = '<div class="cdown-no-date">no exam date set — add one in settings to track your pace</div>';
-    return;
-  }
-
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const goal  = new Date(goalDate + 'T00:00:00');
-  const daysLeft = Math.round((goal - today) / 86400000);
 
-  if (daysLeft === 0) {
-    el.innerHTML = '<div class="cdown-exam-day">// EXAM DAY — you got this! //</div>';
-    return;
-  }
-  if (daysLeft < 0) {
-    el.innerHTML = '<div class="cdown-no-date">exam date passed — update your goal date in settings</div>';
-    return;
-  }
-
-  const weeksLeft = daysLeft / 7;
-  const wFull = Math.floor(daysLeft / 7);
-  const dRem  = daysLeft % 7;
-
+  // ── always-available metrics ───────────────────────────────────────────────
   const machines  = allMachines();
   const total     = machines.length;
   const rooted    = machines.filter(m => state.statuses[m.id] === 'rooted').length;
+  const mastered  = machines.filter(m => (state.rootCount[m.id] || 0) >= 2).length;
   const remaining = total - rooted;
 
-  // current pace: boxes rooted in the last 28 days → per-week average
-  const cutoff = new Date(today);
-  cutoff.setDate(cutoff.getDate() - 28);
-  const cutoffStr    = cutoff.toISOString().slice(0, 10);
-  const recentCount  = Object.values(state.rootedDates).filter(d => d >= cutoffStr).length;
-  const currentPace  = +(recentCount / 4).toFixed(1);
-  const requiredPace = weeksLeft > 0 ? +(remaining / weeksLeft).toFixed(1) : 0;
+  // Boxes rooted in last 7 days
+  const sevenAgo    = new Date(today); sevenAgo.setDate(sevenAgo.getDate() - 7);
+  const sevenAgoStr = sevenAgo.toISOString().slice(0, 10);
+  const thisWeek    = Object.values(state.rootedDates).filter(d => d >= sevenAgoStr).length;
 
-  let statusCls, statusText;
-  if (remaining === 0) {
-    statusCls = 'cdown-status-ahead';  statusText = 'COMPLETE';
-  } else if (currentPace === 0) {
-    statusCls = 'cdown-status-behind'; statusText = 'GET GOING';
-  } else if (currentPace >= requiredPace * 1.15) {
-    statusCls = 'cdown-status-ahead';  statusText = 'AHEAD';
-  } else if (currentPace >= requiredPace * 0.85) {
-    statusCls = 'cdown-status-track';  statusText = 'ON TRACK';
-  } else {
-    statusCls = 'cdown-status-behind'; statusText = 'BEHIND';
+  // 4-week average pace
+  const fourAgo    = new Date(today); fourAgo.setDate(fourAgo.getDate() - 28);
+  const fourAgoStr = fourAgo.toISOString().slice(0, 10);
+  const avgPace    = Object.values(state.rootedDates).filter(d => d >= fourAgoStr).length / 4;
+
+  // Streak: consecutive days with any activity (root or pomodoro)
+  const actDays = new Set(Object.values(state.rootedDates));
+  if (state.pomodoro) {
+    state.pomodoro.sessions.filter(s => s.type === 'work' && s.completed && s.startedAt)
+      .forEach(s => actDays.add(s.startedAt.slice(0, 10)));
   }
+  let streak = 0;
+  const sc = new Date(today);
+  while (actDays.has(sc.toISOString().slice(0, 10))) { streak++; sc.setDate(sc.getDate() - 1); }
+
+  const goalDate = state.settings.goalDate;
+  if (!goalDate) {
+    el.innerHTML = `
+      <div class="cdown-mid" style="flex-wrap:wrap;padding:10px 16px;gap:18px">
+        <div class="cdown-item"><span class="cdown-val">${thisWeek}<span class="cdown-of"> this wk</span></span><span class="cdown-label">rooted</span></div>
+        <div class="cdown-item"><span class="cdown-val">${streak}<span class="cdown-of">d</span></span><span class="cdown-label">streak</span></div>
+        <div class="cdown-item"><span class="cdown-val">${mastered}</span><span class="cdown-label">mastered</span></div>
+        <div class="cdown-item"><span class="cdown-val">${rooted}<span class="cdown-of">/${total}</span></span><span class="cdown-label">total rooted</span></div>
+      </div>
+      <div class="cdown-sep" style="height:40px"></div>
+      <div class="cdown-no-date" style="font-style:italic;padding:10px 14px">set exam date in settings to see countdown ↗</div>`;
+    return;
+  }
+
+  const goal     = new Date(goalDate + 'T00:00:00');
+  const daysLeft = Math.round((goal - today) / 86400000);
+
+  if (daysLeft < 0)  { el.innerHTML = '<div class="cdown-no-date">exam date passed — update in settings</div>'; return; }
+  if (daysLeft === 0){ el.innerHTML = '<div class="cdown-exam-day">// EXAM DAY — you got this! //</div>'; return; }
+
+  const wFull        = Math.floor(daysLeft / 7);
+  const dRem         = daysLeft % 7;
+  const weeksLeft    = daysLeft / 7;
+  const requiredPace = weeksLeft > 0 ? remaining / weeksLeft : 0;
+
+  // ── vibe: multi-dimensional, positive framing ──────────────────────────────
+  let vibe, vibeCls;
+  if (remaining === 0)          { vibe = 'OSCP READY';       vibeCls = 'cdown-status-ahead'; }
+  else if (daysLeft <= 7)       { vibe = 'FINAL STRETCH';    vibeCls = 'cdown-status-track'; }
+  else if (streak >= 7)         { vibe = 'ON FIRE';          vibeCls = 'cdown-status-ahead'; }
+  else if (avgPace >= requiredPace * 1.3) { vibe = 'CRUSHING IT';   vibeCls = 'cdown-status-ahead'; }
+  else if (avgPace >= requiredPace * 0.85){ vibe = 'SOLID PACE';    vibeCls = 'cdown-status-track'; }
+  else if (thisWeek >= 1)       { vibe = 'KEEP GOING';       vibeCls = 'cdown-status-track'; }
+  else if (streak >= 1)         { vibe = 'STAY CONSISTENT';  vibeCls = 'cdown-status-track'; }
+  else if (rooted === 0)        { vibe = "LET'S GO";         vibeCls = 'cdown-status-behind'; }
+  else                          { vibe = 'TIME TO GRIND';    vibeCls = 'cdown-status-behind'; }
+
+  // Pace hint — framed as a gentle suggestion, not a demand
+  const paceHint = remaining > 0 && weeksLeft > 0
+    ? `~${requiredPace.toFixed(1)} boxes/wk to finish in time`
+    : '';
 
   el.innerHTML = `
     <div class="cdown-days-col">
@@ -1031,27 +1092,30 @@ function renderCountdown() {
     <div class="cdown-sep"></div>
     <div class="cdown-mid">
       <div class="cdown-item">
-        <span class="cdown-val">${rooted}<span class="cdown-of">/${total}</span></span>
+        <span class="cdown-val">${thisWeek}<span class="cdown-of"> this wk</span></span>
         <span class="cdown-label">rooted</span>
       </div>
       <div class="cdown-item">
-        <span class="cdown-val">${remaining}</span>
-        <span class="cdown-label">left</span>
+        <span class="cdown-val">${streak}<span class="cdown-of">d</span></span>
+        <span class="cdown-label">streak</span>
       </div>
     </div>
     <div class="cdown-sep"></div>
     <div class="cdown-mid">
       <div class="cdown-item">
-        <span class="cdown-val">${requiredPace}<span class="cdown-of">/wk</span></span>
-        <span class="cdown-label">needed</span>
+        <span class="cdown-val">${rooted}<span class="cdown-of">/${total}</span></span>
+        <span class="cdown-label">rooted</span>
       </div>
       <div class="cdown-item">
-        <span class="cdown-val">${currentPace}<span class="cdown-of">/wk</span></span>
-        <span class="cdown-label">your pace</span>
+        <span class="cdown-val">${mastered}</span>
+        <span class="cdown-label">mastered</span>
       </div>
     </div>
     <div class="cdown-sep"></div>
-    <div class="cdown-status ${statusCls}">${statusText}</div>`;
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 16px;gap:6px;flex-shrink:0">
+      <span class="cdown-status ${vibeCls}">${vibe}</span>
+      ${paceHint ? `<span style="font-size:7px;color:var(--px-text2);text-align:center;line-height:1.6">${paceHint}</span>` : ''}
+    </div>`;
 }
 
 // ── random machine picker ─────────────────────────────────────────────────────
@@ -1099,16 +1163,24 @@ function spinPicker() {
 
 function gotoPickedMachine() {
   if (!_pickedMachine) return;
+  const id = _pickedMachine.id;
   closePicker();
-  ['filter-platform','filter-os','filter-diff','filter-status'].forEach(id =>
-    document.getElementById(id).value = ''
+  ['filter-platform','filter-os','filter-diff','filter-status'].forEach(fid =>
+    document.getElementById(fid).value = ''
   );
   document.getElementById('filter-search').value = '';
   switchTab('machines');
   renderMachines();
   setTimeout(() => {
-    const row = document.getElementById('row-' + _pickedMachine.id);
-    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const row = document.getElementById('row-' + id);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('picked');
+      setTimeout(() => row.classList.remove('picked'), 2100);
+    }
+    // expand notes so the box is unmistakeable
+    const notePanel = document.getElementById('note-' + id);
+    if (notePanel && notePanel.style.display !== 'block') toggleNote(id);
   }, 80);
 }
 

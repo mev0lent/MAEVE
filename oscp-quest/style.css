@@ -138,6 +138,7 @@ body {
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
   margin-bottom: 10px;
 }
+@media (max-width: 700px) { .stats-bar { grid-template-columns: repeat(3, 1fr); } }
 
 .stat-card {
   background: var(--px-surface);
@@ -256,6 +257,13 @@ body {
 .machine-row:hover { border-color: var(--px-text); }
 .machine-row.rooted      { background: var(--px-rooted-bg, #edfff5); border-color: var(--px-rooted-border, #6bc87a); }
 .machine-row.in-progress { background: var(--px-prog-bg,   #fffbe8); border-color: var(--px-prog-border,   #d4b84a); }
+.machine-row.stuck       { background: var(--px-bg);                  border-color: var(--px-red); }
+.machine-row.picked      { animation: picked-pulse 2s ease-out forwards; }
+@keyframes picked-pulse {
+  0%   { box-shadow: 0 0 0 3px var(--px-purple), 0 0 18px 4px var(--px-purple); border-color: var(--px-purple); }
+  60%  { box-shadow: 0 0 0 3px var(--px-purple), 0 0 18px 4px var(--px-purple); border-color: var(--px-purple); }
+  100% { box-shadow: none; border-color: var(--px-border); }
+}
 
 .status-col {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -267,6 +275,7 @@ body {
 .dot-todo     { background: var(--px-bg2); }
 .dot-progress { background: var(--px-yellow); }
 .dot-rooted   { background: var(--px-mint); }
+.dot-stuck    { background: var(--px-red); }
 
 .status-text {
   font-size: 7px; color: var(--px-text2); text-align: center;
@@ -274,6 +283,14 @@ body {
 }
 .status-text.st-rooted   { color: #2a7a3a; }
 .status-text.st-progress { color: #7a5a00; }
+.status-text.st-stuck    { color: var(--px-red); }
+
+.rc-badge {
+  font-size: 7px; color: var(--px-mint);
+  border: 1px solid var(--px-mint);
+  padding: 1px 4px; margin-top: 2px;
+  letter-spacing: 1px;
+}
 
 .machine-name {
   font-size: var(--px-font-sm); color: var(--px-text);
@@ -313,6 +330,15 @@ body {
   background: var(--px-bg2); border: 2px solid var(--px-border);
   border-top: none; margin-top: -4px;
 }
+
+.stuck-note-section {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 2px solid var(--px-red);
+  background: var(--px-bg);
+}
+.stuck-note-label { color: var(--px-red) !important; }
+.stuck-note-area  { min-height: 100px; border-color: var(--px-red) !important; }
 .note-field-label {
   font-size: 8px; color: var(--px-text2); margin-bottom: 4px; display: block;
 }
