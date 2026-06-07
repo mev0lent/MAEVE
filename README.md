@@ -198,6 +198,53 @@ Six themes available in Settings (click a color swatch to switch):
 
 ---
 
+## Bonus: Tool Setup Script
+
+Before you start grinding boxes, you need your toolkit ready. This script sets up a clean `~/tools/` directory with everything you'll reach for during OSCP — downloaded, unpacked, and permissions set.
+
+**What it installs:**
+
+| Category | Tools |
+|---|---|
+| Windows Enumeration & PrivEsc | winPEAS, PrivescCheck, PowerUp |
+| Token-Based PrivEsc | GodPotato, PrintSpoofer, SigmaPotato |
+| Lateral Movement & AD | Mimikatz, LaZagne, RunasCs, PowerView, SharpHound |
+| Tunneling | Chisel (Windows + Linux) |
+| Linux | linPEAS, pspy |
+| Utilities | Netcat, EnableAllTokenPrivs, Get-SPN, SeBackupPrivilege |
+| Kali Packages (apt/pip) | netexec, wesNG |
+
+Existing tools are skipped by default. Pass `--force` to re-download everything.
+
+### Install
+
+```bash
+# option A: download and run directly
+curl -sSL https://gist.github.com/mev0lent/3a88de2b971dae0f5f34ae40e5493d04/raw | bash
+
+# option B: inspect first (better habit)
+curl -o setup_tools.sh https://gist.github.com/mev0lent/3a88de2b971dae0f5f34ae40e5493d04/raw
+cat setup_tools.sh
+bash setup_tools.sh
+```
+
+### Keep it updated
+
+The script lives in a GitHub Gist, which is a git repo under the hood. Clone it once and `git pull` whenever the Gist changes:
+
+```bash
+# clone once
+git clone https://gist.github.com/3a88de2b971dae0f5f34ae40e5493d04.git ~/tools/setup
+
+# update after editing the Gist on GitHub
+cd ~/tools/setup && git pull
+
+# re-run to pick up new tools
+bash ~/tools/setup/setup_tools.sh
+```
+
+---
+
 ## Tips
 
 - **Route your prep**: filter by difficulty `Easy`, knock out todo boxes, then bump to `Medium`
